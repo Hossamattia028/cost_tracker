@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "817886782761",
+    "project_id": "costtracker-e825e",
+    "storage_bucket": "costtracker-e825e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:817886782761:android:f9addb225a02b409584338",
+        "android_client_info": {
+          "package_name": "com.example.cost_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzvKs12GO5Z7TBT22TfqGp4f9h0cVtMRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
