@@ -5,6 +5,10 @@ abstract class AmountAiClient {
   /// Recognizes the single transfer amount from a receipt image.
   Future<String?> fromImage(File file);
 
+  /// Recognizes one transfer amount per receipt image, in the same order.
+  /// Returns `null` for any image where no amount could be read.
+  Future<List<String?>> amountsFromImages(List<File> files);
+
   /// Recognizes the single transfer amount from a text block.
   Future<String?> fromText(String text);
 
@@ -46,3 +50,19 @@ const String kAmountMultiSystemPrompt =
     'Return ONLY a compact JSON array of the transfer amounts as numbers, in '
     'order, e.g. [1000, 250.5, 2000]. No currency, no thousands separators, '
     'dot for decimals, no extra text. If there are no transfers, return [].';
+
+const String kAmountMultiImageSystemPrompt =
+    'You read Egyptian mobile-wallet transfer receipt images (Vodafone Cash, '
+    'Etisalat, Orange, WE) and return the transferred money amount of EACH '
+    'receipt only.\n'
+    'For every image, the amount is the number that appears:\n'
+    '- on the «إجمالي» / «الإجمالي» / «اجمالي» line, or\n'
+    '- after phrases like «تم تحويل» / «قيمة العملية» / «المبلغ المحول» / '
+    '«مبلغ», usually followed by the currency «ج.م» / «جنيه».\n'
+    'STRICTLY IGNORE every other number: phone/wallet numbers (010/011/012/'
+    '015..., «الرقم المحول منه/إليه»), transaction or reference IDs, «رقم '
+    'العميل», «رقم المجموعة», dates, times, and any remaining balance.\n'
+    'The user sends multiple receipt images in order. Return ONLY a compact '
+    'JSON array with one entry per image, in the same order, e.g. '
+    '[1000, null, 250.5]. Use null when an image has no clear transfer amount. '
+    'No currency, no thousands separators, dot for decimals, no extra text.';

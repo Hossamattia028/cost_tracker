@@ -31,21 +31,32 @@ class AmountRecognizer {
   }
 
   Future<String?> fromImage(File file) async {
+    final results = await amountsFromImages([file]);
+    return results.isEmpty ? null : results.first;
+  }
+
+  Future<List<String?>> amountsFromImages(List<File> files) async {
+    if (files.isEmpty) return const [];
     if (AppConstants.amountEngine == AmountEngine.localOcr) {
-      return _ocr.extractAmount(file);
+      final results = <String?>[];
+      for (final file in files) {
+        results.add(await _ocr.extractAmount(file));
+      }
+      return results;
     }
-    // Strict mode: AI only. Errors propagate so the UI can flag the item
-    // instead of silently saving a wrong number from a heuristic fallback.
     if (AppConstants.aiStrictNoFallback) {
-      return _ai.fromImage(file);
+      return _ai.amountsFromImages(files);
     }
     try {
-      final result = await _ai.fromImage(file);
-      if (result != null) return result;
+      return await _ai.amountsFromImages(files);
     } catch (e) {
-      debugPrint('AI image recognition failed, falling back to OCR: $e');
+      debugPrint('AI batch image recognition failed, falling back to OCR: $e');
     }
-    return _ocr.extractAmount(file);
+    final results = <String?>[];
+    for (final file in files) {
+      results.add(await _ocr.extractAmount(file));
+    }
+    return results;
   }
 
   /// Text-only recognition is AI-only (local OCR cannot read free text).

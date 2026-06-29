@@ -25,26 +25,34 @@ class AppConstants {
   ///   * [AiProvider.gemini] — Google Gemini (free tier from Google AI Studio).
   static const AiProvider aiProvider = AiProvider.gemini;
 
-  /// When true, the AI engine never falls back to local OCR. A failed/uncertain
-  /// read surfaces an error instead of saving a possibly-wrong number.
+
   static const bool aiStrictNoFallback = true;
 
   // --- OpenAI ----------------------------------------------------------------
   static const openAiBaseUrl = 'https://api.openai.com/v1/chat/completions';
-  static const openAiModel = 'gpt-4o';
+  static const openAiModel = 'gemini-2.5-flash';
 
-  /// Set in `lib/core/secrets.dart` (copy from `secrets.example.dart`).
+
   static String get openAiApiKey => Secrets.openAiApiKey;
 
   // --- Google Gemini ---------------------------------------------------------
   /// Generative Language API host. The model + key are appended at call time.
-  static const geminiBaseUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models';
+  static const geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-  /// Vision-capable, fast, with a free tier (this key's working model).
-  static const geminiModel = 'gemini-2.5-flash';
+  /// Free-tier models tried in order. Each has its own quota; on 429 the next
+  /// model (or API key) is used automatically before failing the request.
+  static const geminiModels = [
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-3.5-flash',
+  ];
 
-  /// Set in `lib/core/secrets.dart` (copy from `secrets.example.dart`).
+  static const geminiModel = 'gemini-flash-latest';
+
+  static List<String> get geminiApiKeys => Secrets.geminiApiKeys;
+
   static String get geminiApiKey => Secrets.geminiApiKey;
 }
 

@@ -79,39 +79,51 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
     final newItems =
         files.map((file) => PendingImageItem(file: file)).toList();
     setState(() => _items.addAll(newItems));
-    for (final item in newItems) {
-      await _recognizeItem(item);
-    }
+    await _recognizeItems(newItems);
   }
 
-  Future<void> _recognizeItem(PendingImageItem item) async {
+  Future<void> _recognizeItems(List<PendingImageItem> items) async {
+    if (items.isEmpty) return;
     setState(() {
-      item.extracting = true;
-      item.failed = false;
+      for (final item in items) {
+        item.extracting = true;
+        item.failed = false;
+      }
     });
     try {
-      final amount = await _recognizer.fromImage(item.file);
+      final amounts = await _recognizer.amountsFromImages(
+        items.map((item) => item.file).toList(),
+      );
       if (!mounted) return;
       setState(() {
-        if (amount == null) {
-          item.failed = true;
-          item.amount = null;
-        } else {
-          item.amount = amount;
-          item.failed = false;
+        for (var i = 0; i < items.length; i++) {
+          final item = items[i];
+          final amount = i < amounts.length ? amounts[i] : null;
+          if (amount == null) {
+            item.failed = true;
+            item.amount = null;
+          } else {
+            item.amount = amount;
+            item.failed = false;
+          }
+          item.extracting = false;
         }
-        item.extracting = false;
       });
     } catch (e) {
       debugPrint('Image amount recognition error: $e');
       if (!mounted) return;
       setState(() {
-        item.failed = true;
-        item.amount = null;
-        item.extracting = false;
+        for (final item in items) {
+          item.failed = true;
+          item.amount = null;
+          item.extracting = false;
+        }
       });
     }
   }
+
+  Future<void> _recognizeItem(PendingImageItem item) =>
+      _recognizeItems([item]);
 
   Future<bool> _ensureCameraPermission() async {
     var status = await Permission.camera.status;

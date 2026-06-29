@@ -79,24 +79,40 @@ class AiAmountService implements AmountAiClient {
 
   @override
   Future<String?> fromImage(File file) async {
-    final dataUrl = await _imageToDataUrl(file);
-    if (dataUrl == null) return null;
-    return _complete([
-      {'role': 'system', 'content': _systemPrompt},
+    final results = await amountsFromImages([file]);
+    return results.isEmpty ? null : results.first;
+  }
+
+  @override
+  Future<List<String?>> amountsFromImages(List<File> files) async {
+    if (files.isEmpty) return const [];
+
+    final imageParts = <Map<String, dynamic>>[
       {
-        'role': 'user',
-        'content': [
-          {
-            'type': 'text',
-            'text': 'Read this receipt and return the total (إجمالي) amount.',
-          },
-          {
-            'type': 'image_url',
-            'image_url': {'url': dataUrl},
-          },
-        ],
+        'type': 'text',
+        'text':
+            'Read each receipt image below and return the total (إجمالي) '
+            'transfer amount for each image, in order. '
+            '${files.length} image(s) provided.',
       },
-    ]);
+    ];
+    for (final file in files) {
+      final dataUrl = await _imageToDataUrl(file);
+      if (dataUrl == null) continue;
+      imageParts.add({
+        'type': 'image_url',
+        'image_url': {'url': dataUrl},
+      });
+    }
+    if (imageParts.length == 1) {
+      return List<String?>.filled(files.length, null);
+    }
+
+    final content = await _completeRaw([
+      {'role': 'system', 'content': kAmountMultiImageSystemPrompt},
+      {'role': 'user', 'content': imageParts},
+    ], maxTokens: math.max(256, files.length * 64));
+    return _parseNullableAmountList(content, expectedLength: files.length);
   }
 
   Future<String?> _complete(List<Map<String, dynamic>> messages) async {
@@ -150,16 +166,23 @@ class AiAmountService implements AmountAiClient {
   }
 
   List<String> _parseAmountList(String content) {
+    return _parseNullableAmountList(content)
+        .whereType<String>()
+        .toList(growable: false);
+  }
+
+  List<String?> _parseNullableAmountList(
+    String content, {
+    int? expectedLength,
+  }) {
     final normalized = _normalizeNumerals(content);
-    // Isolate the JSON array if the model added any wrapping text/fences.
     final start = normalized.indexOf('[');
     final end = normalized.lastIndexOf(']');
     final slice = (start != -1 && end > start)
         ? normalized.substring(start, end + 1)
         : normalized;
 
-    final results = <String>[];
-
+    final results = <String?>[];
     List<dynamic>? parsed;
     try {
       final decoded = jsonDecode(slice);
@@ -168,16 +191,24 @@ class AiAmountService implements AmountAiClient {
 
     if (parsed != null) {
       for (final item in parsed) {
-        final cleaned = _cleanNumber(item.toString());
-        if (cleaned != null) results.add(cleaned);
+        if (item == null) {
+          results.add(null);
+          continue;
+        }
+        results.add(_cleanNumber(item.toString()));
       }
-      return results;
+    } else {
+      for (final m in RegExp(r'\d[\d,]*(?:\.\d+)?').allMatches(slice)) {
+        results.add(_cleanNumber(m.group(0)!));
+      }
     }
 
-    // Fallback: pull every number-like token from the response.
-    for (final m in RegExp(r'\d[\d,]*(?:\.\d+)?').allMatches(slice)) {
-      final cleaned = _cleanNumber(m.group(0)!);
-      if (cleaned != null) results.add(cleaned);
+    if (expectedLength == null) return results;
+    while (results.length < expectedLength) {
+      results.add(null);
+    }
+    if (results.length > expectedLength) {
+      return results.sublist(0, expectedLength);
     }
     return results;
   }
