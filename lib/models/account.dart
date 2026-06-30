@@ -6,6 +6,8 @@ class Account {
   final String? description;
   final String currency;
   final double commissionPercent;
+  final double openingBalance;
+  final double totalBalance;
   final DateTime createdAt;
 
   const Account({
@@ -14,6 +16,8 @@ class Account {
     this.description,
     this.currency = 'EGP',
     this.commissionPercent = 0,
+    this.openingBalance = 0,
+    this.totalBalance = 0,
     required this.createdAt,
   });
 
@@ -24,6 +28,8 @@ class Account {
         'description': description,
         'currency': currency,
         'commissionPercent': commissionPercent,
+        'openingBalance': openingBalance,
+        'totalBalance': totalBalance,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -34,6 +40,8 @@ class Account {
         currency: map['currency'] as String? ?? 'EGP',
         commissionPercent:
             (map['commissionPercent'] as num?)?.toDouble() ?? 0,
+        openingBalance: (map['openingBalance'] as num?)?.toDouble() ?? 0,
+        totalBalance: (map['totalBalance'] as num?)?.toDouble() ?? 0,
         createdAt: parseFirestoreDate(map['createdAt']),
       );
 
@@ -42,6 +50,8 @@ class Account {
     String? description,
     String? currency,
     double? commissionPercent,
+    double? openingBalance,
+    double? totalBalance,
   }) =>
       Account(
         id: id,
@@ -49,6 +59,8 @@ class Account {
         description: description ?? this.description,
         currency: currency ?? this.currency,
         commissionPercent: commissionPercent ?? this.commissionPercent,
+        openingBalance: openingBalance ?? this.openingBalance,
+        totalBalance: totalBalance ?? this.totalBalance,
         createdAt: createdAt,
       );
 

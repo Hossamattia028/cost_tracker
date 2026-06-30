@@ -123,4 +123,8 @@ class AppStrings {
       'لم يتم السماح بالوصول للصور. يرجى منح الإذن من إعدادات التطبيق.';
   static const openSettings = 'الإعدادات';
   static const imagePickFailed = 'تعذر اختيار الصورة';
+  static const recordDate = 'تاريخ العملية';
+  static const pickDate = 'اختيار التاريخ';
+  static const changeDate = 'تعديل التاريخ';
+  static const dateUpdated = 'تم تحديث تاريخ العملية';
 }

@@ -9,6 +9,7 @@ import 'accounts_screen.dart';
 import 'add_record_screen.dart';
 import 'admin_users_screen.dart';
 import 'reports_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -101,6 +102,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (_) => const AccountFormDialog(),
               ),
             ),
+          IconButton(
+            tooltip: 'الإعدادات',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
           IconButton(
             tooltip: AppStrings.logout,
             icon: const Icon(Icons.logout),

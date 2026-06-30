@@ -160,21 +160,21 @@ class _LoginScreenState extends State<LoginScreen> {
                           : const Text(AppStrings.login),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: loading ? null : _loginAsAdmin,
-                    icon: const Icon(Icons.admin_panel_settings),
-                    label: const Text(AppStrings.loginAsAdmin),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppStrings.defaultAdminHint,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                  ),
+                  // const SizedBox(height: 12),
+                  // OutlinedButton.icon(
+                  //   onPressed: loading ? null : _loginAsAdmin,
+                  //   icon: const Icon(Icons.admin_panel_settings),
+                  //   label: const Text(AppStrings.loginAsAdmin),
+                  //   style: OutlinedButton.styleFrom(
+                  //     minimumSize: const Size(double.infinity, 48),
+                  //   ),
+                  // ),
+                  // const SizedBox(height: 16),
+                  // Text(
+                  //   AppStrings.defaultAdminHint,
+                  //   textAlign: TextAlign.center,
+                  //   style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                  // ),
                 ],
               ),
             ),

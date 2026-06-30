@@ -25,7 +25,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   bool _selectionMode = false;
   final Set<String> _selected = {};
 
-  Account get account => widget.account;
+  Account get initialAccount => widget.account;
 
   @override
   void dispose() {
@@ -35,7 +35,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   List<CostRecord> _filtered(List<CostRecord> all) {
     final records =
-        all.where((r) => r.accountId == account.id).toList();
+        all.where((r) => r.accountId == initialAccount.id).toList();
     if (_query.trim().isEmpty) return records;
     final q = _query.trim().toLowerCase();
     return records.where((r) {
@@ -55,6 +55,32 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         _query = '';
       }
     });
+  }
+
+  Future<void> _changeRecordDate(CostRecord record) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: record.createdAt,
+      firstDate: DateTime(DateTime.now().year - 5),
+      lastDate: DateTime(DateTime.now().year + 5),
+      locale: const Locale('ar'),
+    );
+    if (picked == null || !mounted) return;
+
+    final newDate = DateTime(
+      picked.year,
+      picked.month,
+      picked.day,
+      record.createdAt.hour,
+      record.createdAt.minute,
+      record.createdAt.second,
+    );
+    await context.read<AppProvider>().updateRecordDate(record.id, newDate);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.dateUpdated)),
+      );
+    }
   }
 
   void _enterSelection(String id) {
@@ -117,7 +143,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       message: AppStrings.deleteAllRecordsConfirm,
     );
     if (!confirm || !mounted) return;
-    await context.read<AppProvider>().deleteAllRecordsForAccount(account.id);
+    await context.read<AppProvider>().deleteAllRecordsForAccount(initialAccount.id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text(AppStrings.recordsDeleted)),
@@ -133,12 +159,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       appBar: _buildAppBar(cs),
       body: Consumer<AppProvider>(
         builder: (context, provider, _) {
+          final account = provider.accountsById[initialAccount.id] ?? initialAccount;
           final filtered = _filtered(provider.records);
           final allForAccount = provider.records
               .where((r) => r.accountId == account.id)
               .toList();
           final total =
               allForAccount.fold<double>(0, (s, r) => s + r.amount);
+          final remaining = provider.remainingForAccount(account);
+          final todaySpent = provider.todaySpentForAccount(account.id);
+          final todayRemaining = provider.todayRemainingForAccount(account);
           final commissionTotal = allForAccount.fold<double>(
               0, (s, r) => s + account.commissionFor(r.amount));
 
@@ -149,7 +179,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
           return Column(
             children: [
-              _summaryCard(cs, total, commissionTotal, allForAccount.length),
+              _summaryCard(
+                cs,
+                account,
+                total,
+                remaining,
+                todaySpent,
+                todayRemaining,
+                commissionTotal,
+                allForAccount.length,
+              ),
               Expanded(
                 child: allForAccount.isEmpty
                     ? _emptyState()
@@ -182,6 +221,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                                         .deleteRecord(record.id);
                                   }
                                 },
+                                onChangeDate: () => _changeRecordDate(record),
                               );
                             },
                           ),
@@ -217,7 +257,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               final records = context
                   .read<AppProvider>()
                   .records
-                  .where((r) => r.accountId == account.id)
+                  .where((r) => r.accountId == initialAccount.id)
                   .toList();
               _selectAll(records);
             },
@@ -261,7 +301,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
 
     return AppBar(
-      title: Text(account.name),
+      title: Text(initialAccount.name),
       actions: [
         IconButton(
           icon: const Icon(Icons.search),
@@ -301,7 +341,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
 
   Widget _summaryCard(
     ColorScheme cs,
+    Account account,
     double total,
+    double remaining,
+    double todaySpent,
+    double todayRemaining,
     double commissionTotal,
     int count,
   ) {
@@ -342,6 +386,38 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _summaryChip(
+                cs,
+                'الرصيد الكلي',
+                '${account.totalBalance.toStringAsFixed(2)} ${account.currency}',
+              ),
+              _summaryChip(
+                cs,
+                'المتبقي',
+                '${remaining.toStringAsFixed(2)} ${account.currency}',
+              ),
+              _summaryChip(
+                cs,
+                'افتتاحي اليوم',
+                '${account.openingBalance.toStringAsFixed(2)} ${account.currency}',
+              ),
+              _summaryChip(
+                cs,
+                'سحب اليوم',
+                '${todaySpent.toStringAsFixed(2)} ${account.currency}',
+              ),
+              _summaryChip(
+                cs,
+                'متبقي اليوم',
+                '${todayRemaining.toStringAsFixed(2)} ${account.currency}',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Text(
@@ -356,6 +432,37 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryChip(ColorScheme cs, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.onPrimary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: cs.onPrimary.withValues(alpha: 0.8),
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              color: cs.onPrimary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -383,7 +490,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AddRecordScreen(preselectedAccount: account),
+        builder: (_) => AddRecordScreen(preselectedAccount: initialAccount),
       ),
     );
   }
@@ -398,6 +505,7 @@ class _RecordCard extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback onToggleSelected;
   final VoidCallback onDelete;
+  final VoidCallback onChangeDate;
 
   const _RecordCard({
     required this.record,
@@ -408,6 +516,7 @@ class _RecordCard extends StatelessWidget {
     required this.onLongPress,
     required this.onToggleSelected,
     required this.onDelete,
+    required this.onChangeDate,
   });
 
   @override
@@ -476,10 +585,19 @@ class _RecordCard extends StatelessWidget {
                 ),
               ),
               if (!selectionMode)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  color: cs.error,
-                  onPressed: onDelete,
+                Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_calendar_outlined, size: 20),
+                      tooltip: AppStrings.changeDate,
+                      onPressed: onChangeDate,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      color: cs.error,
+                      onPressed: onDelete,
+                    ),
+                  ],
                 ),
             ],
           ),

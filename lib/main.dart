@@ -90,6 +90,7 @@ class CostTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const seedColor = Color(0xFF2563EB);
+    final themeMode = context.watch<AppProvider>().themeMode;
 
     return MaterialApp(
       title: AppStrings.appName,
@@ -105,27 +106,37 @@ class CostTrackerApp extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: child!,
       ),
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: seedColor,
-        brightness: Brightness.light,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          scrolledUnderElevation: 1,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+      themeMode: themeMode,
+      theme: _buildTheme(seedColor, Brightness.light),
+      darkTheme: _buildTheme(seedColor, Brightness.dark),
+      home: const AuthGate(),
+    );
+  }
+
+  ThemeData _buildTheme(Color seedColor, Brightness brightness) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seedColor,
+      brightness: brightness,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      brightness: brightness,
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
-      home: const AuthGate(),
     );
   }
 }

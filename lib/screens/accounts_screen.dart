@@ -4,6 +4,7 @@ import '../core/app_strings.dart';
 import '../models/account.dart';
 import '../services/app_provider.dart';
 import '../widgets/account_form_dialog.dart';
+import '../widgets/account_pin_dialogs.dart';
 import 'account_detail_screen.dart';
 
 class AccountsScreen extends StatelessWidget {
@@ -39,47 +40,34 @@ class AccountsScreen extends StatelessWidget {
   }
 }
 
-class _AccountCard extends StatefulWidget {
+class _AccountCard extends StatelessWidget {
   final Account account;
   final bool isAdmin;
   const _AccountCard({required this.account, required this.isAdmin});
 
   @override
-  State<_AccountCard> createState() => _AccountCardState();
-}
-
-class _AccountCardState extends State<_AccountCard> {
-  double _total = 0;
-  bool _loaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTotal();
-  }
-
-  Future<void> _loadTotal() async {
-    final total = await context
-        .read<AppProvider>()
-        .getTotalForAccount(widget.account.id);
-    if (mounted) setState(() { _total = total; _loaded = true; });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final provider = context.watch<AppProvider>();
     final cs = Theme.of(context).colorScheme;
-    final account = widget.account;
+    final account = this.account;
+    final withdrawn = provider.spentForAccount(account.id);
+    final remaining = provider.remainingForAccount(account);
+    final openingRemaining = provider.todayRemainingForAccount(account);
 
     return Card(
       color: cs.surfaceContainerLow,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AccountDetailScreen(account: account),
-          ),
-        ).then((_) => _loadTotal()),
+        onTap: () async {
+          final allowed = await showVerifyPinDialog(context);
+          if (!allowed || !context.mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AccountDetailScreen(account: account),
+            ),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -113,39 +101,65 @@ class _AccountCardState extends State<_AccountCard> {
                       '${AppStrings.commission}: ${account.commissionPercent.toStringAsFixed(1)}%',
                       style: TextStyle(color: cs.secondary, fontSize: 12),
                     ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _BalancePill(
+                          label: 'سحب حتى الآن',
+                          value: withdrawn,
+                          currency: account.currency,
+                          background: cs.errorContainer,
+                          foreground: cs.onErrorContainer,
+                        ),
+                        _BalancePill(
+                          label: 'المتبقي',
+                          value: remaining,
+                          currency: account.currency,
+                          background: cs.tertiaryContainer,
+                          foreground: cs.onTertiaryContainer,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'افتتاحي اليوم: ${account.openingBalance.toStringAsFixed(2)} ${account.currency}  |  المتبقي اليوم: ${openingRemaining.toStringAsFixed(2)} ${account.currency}',
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _loaded
-                      ? Text(
-                          '${_total.toStringAsFixed(2)} ${account.currency}',
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2)),
-                  Text(AppStrings.total,
-                      style: TextStyle(
-                          color: cs.onSurfaceVariant, fontSize: 11)),
+                  Text(
+                    '${account.totalBalance.toStringAsFixed(2)} ${account.currency}',
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'الرصيد الكلي',
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+                  ),
                 ],
               ),
-              if (widget.isAdmin) ...[
+              if (isAdmin) ...[
                 const SizedBox(width: 4),
                 PopupMenuButton<String>(
                   onSelected: (v) async {
                     if (v == 'edit') {
+                      final allowed = await showVerifyPinDialog(context);
+                      if (!allowed || !context.mounted) return;
                       await showDialog(
                         context: context,
                         builder: (_) => AccountFormDialog(account: account),
                       );
                     } else if (v == 'delete') {
+                      final allowed = await showVerifyPinDialog(context);
+                      if (!allowed || !context.mounted) return;
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (_) => AlertDialog(
@@ -180,6 +194,41 @@ class _AccountCardState extends State<_AccountCard> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BalancePill extends StatelessWidget {
+  final String label;
+  final double value;
+  final String currency;
+  final Color background;
+  final Color foreground;
+
+  const _BalancePill({
+    required this.label,
+    required this.value,
+    required this.currency,
+    required this.background,
+    required this.foreground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label: ${value.toStringAsFixed(2)} $currency',
+        style: TextStyle(
+          color: foreground,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../core/app_strings.dart';
@@ -16,12 +18,16 @@ class PendingImageItem {
   String? amount; // recognized value (read-only)
   bool extracting;
   bool failed;
+  bool duplicate;
+  int? duplicateOf;
 
   PendingImageItem({
     required this.file,
     this.amount,
     this.extracting = true,
     this.failed = false,
+    this.duplicate = false,
+    this.duplicateOf,
   });
 }
 
@@ -51,6 +57,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
   List<String> _textAmounts = [];
   bool _submitting = false;
   bool _extractingText = false;
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -76,10 +83,33 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _addImages(List<File> files) async {
-    final newItems =
-        files.map((file) => PendingImageItem(file: file)).toList();
+    final existingFingerprints = <String, int>{};
+    for (var i = 0; i < _items.length; i++) {
+      final fingerprint = await _imageFingerprint(_items[i].file);
+      if (fingerprint != null) existingFingerprints[fingerprint] = i;
+    }
+
+    final newItems = <PendingImageItem>[];
+    final newFingerprints = <String, int>{};
+    for (final file in files) {
+      final item = PendingImageItem(file: file);
+      final fingerprint = await _imageFingerprint(file);
+      if (fingerprint != null) {
+        final duplicateIndex =
+            existingFingerprints[fingerprint] ?? newFingerprints[fingerprint];
+        if (duplicateIndex != null) {
+          item.duplicate = true;
+          item.extracting = false;
+          item.failed = false;
+          item.duplicateOf = duplicateIndex;
+        } else {
+          newFingerprints[fingerprint] = _items.length + newItems.length;
+        }
+      }
+      newItems.add(item);
+    }
     setState(() => _items.addAll(newItems));
-    await _recognizeItems(newItems);
+    await _recognizeItems(newItems.where((item) => !item.duplicate).toList());
   }
 
   Future<void> _recognizeItems(List<PendingImageItem> items) async {
@@ -153,6 +183,27 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
     );
   }
 
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 5),
+      locale: const Locale('ar'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDate = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        now.hour,
+        now.minute,
+      );
+    });
+  }
+
   Future<void> _pickImages(ImageSource source) async {
     try {
       if (source == ImageSource.camera) {
@@ -204,6 +255,29 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
 
   void _removeItem(int index) {
     setState(() => _items.removeAt(index));
+  }
+
+  Future<String?> _imageFingerprint(File file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      var decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+      decoded = img.bakeOrientation(decoded);
+
+      if (decoded.width > 512 || decoded.height > 512) {
+        final scale = decoded.width > decoded.height
+            ? 512 / decoded.width
+            : 512 / decoded.height;
+        decoded = img.copyResize(
+          decoded,
+          width: (decoded.width * scale).round(),
+          height: (decoded.height * scale).round(),
+        );
+      }
+      return img.encodeJpg(decoded, quality: 70).join(',');
+    } catch (_) {
+      return null;
+    }
   }
 
   double get _imageAmountsSum {
@@ -273,18 +347,23 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
       _showError(AppStrings.addImagesFirst);
       return;
     }
-    if (_items.any((i) => i.extracting)) {
+    final activeItems = _items.where((i) => !i.duplicate).toList();
+    if (activeItems.isEmpty) {
+      _showError('كل الصور المضافة مكررة');
+      return;
+    }
+    if (activeItems.any((i) => i.extracting)) {
       _showError(AppStrings.waitExtraction);
       return;
     }
-    if (_items.any((i) => i.failed || i.amount == null)) {
+    if (activeItems.any((i) => i.failed || i.amount == null)) {
       _showError(AppStrings.fixFailedFirst);
       return;
     }
 
     final images = <File>[];
     final amounts = <double>[];
-    for (final item in _items) {
+    for (final item in activeItems) {
       final value = double.tryParse(item.amount!.replaceAll(',', ''));
       if (value == null || value <= 0) {
         _showError(AppStrings.fixFailedFirst);
@@ -301,6 +380,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
             images: images,
             amounts: amounts,
             note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+            createdAt: _selectedDate,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -335,6 +415,7 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
             accountId: _selectedAccountId!,
             amounts: amounts,
             note: note.isEmpty ? null : note,
+            createdAt: _selectedDate,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -386,6 +467,8 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
               onChanged: (v) => setState(() => _selectedAccountId = v),
             ),
             const SizedBox(height: 20),
+            _dateField(),
+            const SizedBox(height: 16),
             if (widget.sharedImages == null) _modeSelector(),
             const SizedBox(height: 16),
             if (_mode == RecordMode.image)
@@ -428,6 +511,29 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
       ],
       selected: {_mode},
       onSelectionChanged: (s) => setState(() => _mode = s.first),
+    );
+  }
+
+  Widget _dateField() {
+    final text = DateFormat('yyyy/MM/dd', 'ar').format(_selectedDate);
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: _pickDate,
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: AppStrings.recordDate,
+          prefixIcon: Icon(Icons.calendar_today_outlined),
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Text(text)),
+            TextButton(
+              onPressed: _pickDate,
+              child: const Text(AppStrings.pickDate),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -633,7 +739,11 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
         else ...[
           ...List.generate(_items.length, (i) => _imageItemCard(cs, i)),
           const SizedBox(height: 8),
-          _sumCard(cs, _imageAmountsSum, _items.length),
+          _sumCard(
+            cs,
+            _imageAmountsSum,
+            _items.where((i) => !i.duplicate).length,
+          ),
         ],
         const SizedBox(height: 12),
         TextField(
@@ -678,6 +788,25 @@ class _AddRecordScreenState extends State<AddRecordScreen> {
   }
 
   Widget _imageItemStatus(ColorScheme cs, PendingImageItem item) {
+    if (item.duplicate) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'صورة مكررة',
+            style: TextStyle(
+              color: cs.error,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'لن تُرسل للذكاء الاصطناعي ولن تُحسب مرتين',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+          ),
+        ],
+      );
+    }
     if (item.extracting) {
       return const Row(
         children: [

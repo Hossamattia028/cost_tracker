@@ -18,6 +18,8 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descCtrl;
   late final TextEditingController _commissionCtrl;
+  late final TextEditingController _openingBalanceCtrl;
+  late final TextEditingController _totalBalanceCtrl;
   late String _currency;
 
   static const _currencies = ['EGP', 'USD', 'EUR', 'SAR', 'AED'];
@@ -31,6 +33,12 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
     _commissionCtrl = TextEditingController(
       text: widget.account?.commissionPercent.toString() ?? '0',
     );
+    _openingBalanceCtrl = TextEditingController(
+      text: widget.account?.openingBalance.toString() ?? '0',
+    );
+    _totalBalanceCtrl = TextEditingController(
+      text: widget.account?.totalBalance.toString() ?? '0',
+    );
     _currency = widget.account?.currency ?? 'EGP';
   }
 
@@ -39,6 +47,8 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _commissionCtrl.dispose();
+    _openingBalanceCtrl.dispose();
+    _totalBalanceCtrl.dispose();
     super.dispose();
   }
 
@@ -47,6 +57,10 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
     final provider = context.read<AppProvider>();
     final commission =
         double.tryParse(_commissionCtrl.text.replaceAll(',', '')) ?? 0;
+    final openingBalance =
+        double.tryParse(_openingBalanceCtrl.text.replaceAll(',', '')) ?? 0;
+    final totalBalance =
+        double.tryParse(_totalBalanceCtrl.text.replaceAll(',', '')) ?? 0;
 
     if (widget.account == null) {
       await provider.addAccount(Account(
@@ -57,6 +71,8 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
             : _descCtrl.text.trim(),
         currency: _currency,
         commissionPercent: commission,
+        openingBalance: openingBalance,
+        totalBalance: totalBalance,
         createdAt: DateTime.now(),
       ));
     } else {
@@ -67,6 +83,8 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
             : _descCtrl.text.trim(),
         currency: _currency,
         commissionPercent: commission,
+        openingBalance: openingBalance,
+        totalBalance: totalBalance,
       ));
     }
 
@@ -113,6 +131,32 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _openingBalanceCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'الرصيد الافتتاحي لليوم',
+                  prefixIcon: Icon(Icons.today_outlined),
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,-]')),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _totalBalanceCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'الرصيد الكلي',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,-]')),
                 ],
               ),
               const SizedBox(height: 12),

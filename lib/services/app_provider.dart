@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 import '../models/account.dart';
 import '../models/app_user.dart';
@@ -15,6 +16,10 @@ import 'image_api_service.dart';
 import 'share_intent_service.dart';
 
 class AppProvider extends ChangeNotifier {
+  static const _prefThemeMode = 'theme_mode';
+  static const _prefAccountPin = 'account_pin';
+  static const _defaultAccountPin = '123';
+
   AppProvider({
     AuthService? authService,
     FirebaseService? firebaseService,
@@ -32,6 +37,7 @@ class AppProvider extends ChangeNotifier {
   final ImageApiService _imageApi;
   final ExportService _export;
   final ShareIntentService _shareIntent;
+  SharedPreferences? _prefs;
 
   AppUser? _currentUser;
   List<Account> _accounts = [];
@@ -41,6 +47,7 @@ class AppProvider extends ChangeNotifier {
   bool _profileLoading = false;
   String? _profileError;
   List<File> _pendingSharedImages = [];
+  ThemeMode _themeMode = ThemeMode.system;
 
   StreamSubscription? _accountsSub;
   StreamSubscription? _recordsSub;
@@ -57,6 +64,8 @@ class AppProvider extends ChangeNotifier {
   String? get profileError => _profileError;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
   List<File> get pendingSharedImages => _pendingSharedImages;
+  ThemeMode get themeMode => _themeMode;
+  bool get hasAccountPin => (_prefs?.getString(_prefAccountPin) ?? '').isNotEmpty;
 
   List<Account> get _visibleAccounts {
     final user = _currentUser;
@@ -70,6 +79,11 @@ class AppProvider extends ChangeNotifier {
       };
 
   Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+    _themeMode = _themeModeFromString(_prefs?.getString(_prefThemeMode));
+    if ((_prefs?.getString(_prefAccountPin) ?? '').isEmpty) {
+      await _prefs?.setString(_prefAccountPin, _defaultAccountPin);
+    }
     _authSub = _auth.authStateChanges.listen(_onAuthChanged);
     _shareSub = _shareIntent.sharedImages.listen((files) {
       _pendingSharedImages = files;
@@ -206,11 +220,74 @@ class AppProvider extends ChangeNotifier {
   Future<double> getTotalForAccount(String accountId) =>
       _firebase.getTotalForAccount(accountId);
 
+  double spentForAccount(String accountId) => _records
+      .where((r) => r.accountId == accountId)
+      .fold(0, (totalSpent, r) => totalSpent + r.amount);
+
+  double todaySpentForAccount(String accountId) {
+    final now = DateTime.now();
+    return _records.where((r) {
+      if (r.accountId != accountId) return false;
+      final d = r.createdAt;
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }).fold(0, (totalSpent, r) => totalSpent + r.amount);
+  }
+
+  double remainingForAccount(Account account) =>
+      account.totalBalance - spentForAccount(account.id);
+
+  double todayRemainingForAccount(Account account) =>
+      remainingForAccount(account);
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    await _prefs?.setString(_prefThemeMode, mode.name);
+    notifyListeners();
+  }
+
+  Future<void> setAccountPin(String pin) async {
+    final trimmed = pin.trim();
+    if (trimmed.isEmpty) {
+      await _prefs?.remove(_prefAccountPin);
+    } else {
+      await _prefs?.setString(_prefAccountPin, trimmed);
+    }
+    notifyListeners();
+  }
+
+  Future<bool> changeAccountPin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    final saved = _prefs?.getString(_prefAccountPin) ?? _defaultAccountPin;
+    if (saved.isNotEmpty && saved != currentPin.trim()) return false;
+    await setAccountPin(newPin);
+    return true;
+  }
+
+  bool verifyAccountPin(String pin) {
+    final saved = _prefs?.getString(_prefAccountPin) ?? _defaultAccountPin;
+    if (saved.isEmpty) return true;
+    return saved == pin.trim();
+  }
+
+  ThemeMode _themeModeFromString(String? value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
   Future<void> addRecordsBatch({
     required String accountId,
     required List<File> images,
     required List<double> amounts,
     String? note,
+    required DateTime createdAt,
   }) async {
     final user = _currentUser;
     if (user == null) throw StateError('Not signed in');
@@ -218,7 +295,6 @@ class AppProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      final now = DateTime.now();
       final records = List.generate(
         images.length,
         (i) => CostRecord(
@@ -227,7 +303,7 @@ class AppProvider extends ChangeNotifier {
           amount: amounts[i],
           note: note,
           imageUrl: '',
-          createdAt: now,
+          createdAt: createdAt,
           createdBy: user.uid,
         ),
       );
@@ -247,8 +323,14 @@ class AppProvider extends ChangeNotifier {
     required String accountId,
     required double amount,
     String? note,
+    required DateTime createdAt,
   }) =>
-      addManualRecords(accountId: accountId, amounts: [amount], note: note);
+      addManualRecords(
+        accountId: accountId,
+        amounts: [amount],
+        note: note,
+        createdAt: createdAt,
+      );
 
   /// Adds several text-based records at once (no images) — e.g. all the
   /// transfers parsed from a single chat/summary for a customer.
@@ -256,6 +338,7 @@ class AppProvider extends ChangeNotifier {
     required String accountId,
     required List<double> amounts,
     String? note,
+    required DateTime createdAt,
   }) async {
     final user = _currentUser;
     if (user == null) throw StateError('Not signed in');
@@ -264,7 +347,6 @@ class AppProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      final now = DateTime.now();
       final records = [
         for (final amount in amounts)
           CostRecord(
@@ -273,7 +355,7 @@ class AppProvider extends ChangeNotifier {
             amount: amount,
             note: note,
             imageUrl: '',
-            createdAt: now,
+            createdAt: createdAt,
             createdBy: user.uid,
           ),
       ];
@@ -371,6 +453,11 @@ class AppProvider extends ChangeNotifier {
         .toList();
     return deleteRecords(ids);
   }
+
+  Future<void> updateRecordDate(String recordId, DateTime createdAt) =>
+      _firebase.updateRecord(recordId, {
+        'createdAt': createdAt.toIso8601String(),
+      });
 
   List<CostRecord> getFilteredRecords({
     required ReportPeriod period,

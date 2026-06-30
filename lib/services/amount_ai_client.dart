@@ -62,6 +62,8 @@ const String kAmountMultiImageSystemPrompt =
     'STRICTLY IGNORE every other number: phone/wallet numbers (010/011/012/'
     '015..., «الرقم المحول منه/إليه»), transaction or reference IDs, «رقم '
     'العميل», «رقم المجموعة», dates, times, and any remaining balance.\n'
+    'If an image is a duplicate of an earlier image in the same batch, return '
+    'null for that duplicate entry.\n'
     'The user sends multiple receipt images in order. Return ONLY a compact '
     'JSON array with one entry per image, in the same order, e.g. '
     '[1000, null, 250.5]. Use null when an image has no clear transfer amount. '
