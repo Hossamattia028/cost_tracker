@@ -5,7 +5,7 @@ import '../core/app_strings.dart';
 import '../core/constants.dart';
 import '../services/app_provider.dart';
 import '../services/firestore_helper.dart';
-import '../widgets/app_logo.dart';
+import '../widgets/app_logo_title.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? profileError;
@@ -78,7 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final loading = context.watch<AppProvider>().loading;
 
     return Scaffold(
@@ -90,13 +89,9 @@ class _LoginScreenState extends State<LoginScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  const AppLogo(size: 88),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppStrings.appName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                  const AppLogoTitle(
+                    title: AppStrings.appName,
+                    vertical: true,
                   ),
                   const SizedBox(height: 32),
                   TextFormField(

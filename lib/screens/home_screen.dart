@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'package:cost_tracker/widgets/app_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/app_strings.dart';
 import '../services/app_provider.dart';
 import '../widgets/account_form_dialog.dart';
+import '../widgets/app_logo_title.dart';
 import '../widgets/confirm_logout_dialog.dart';
 import 'accounts_screen.dart';
 import 'add_record_screen.dart';
@@ -91,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabTitle(_tab, isAdmin)),
+        leading: const AppLogo(size: AppBranding.logoSize),
         actions: [
           if (isAdmin && _tab == 0)
             IconButton(

@@ -167,6 +167,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           final total =
               allForAccount.fold<double>(0, (s, r) => s + r.amount);
           final remaining = provider.remainingForAccount(account);
+          final todayOpening = provider.todayOpeningForAccount(account);
           final todaySpent = provider.todaySpentForAccount(account.id);
           final todayRemaining = provider.todayRemainingForAccount(account);
           final commissionTotal = allForAccount.fold<double>(
@@ -184,6 +185,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 account,
                 total,
                 remaining,
+                todayOpening,
                 todaySpent,
                 todayRemaining,
                 commissionTotal,
@@ -344,6 +346,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     Account account,
     double total,
     double remaining,
+    double todayOpening,
     double todaySpent,
     double todayRemaining,
     double commissionTotal,
@@ -403,7 +406,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               _summaryChip(
                 cs,
                 'افتتاحي اليوم',
-                '${account.openingBalance.toStringAsFixed(2)} ${account.currency}',
+                '${todayOpening.toStringAsFixed(2)} ${account.currency}',
               ),
               _summaryChip(
                 cs,

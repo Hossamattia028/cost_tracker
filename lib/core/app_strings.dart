@@ -1,5 +1,5 @@
 class AppStrings {
-  static const appName = 'متتبع التكاليف';
+  static const appName = 'Fire Cash';
   static const login = 'تسجيل الدخول';
   static const email = 'البريد الإلكتروني';
   static const password = 'كلمة المرور';
@@ -126,5 +126,11 @@ class AppStrings {
   static const recordDate = 'تاريخ العملية';
   static const pickDate = 'اختيار التاريخ';
   static const changeDate = 'تعديل التاريخ';
+  static const dateFrom = 'من تاريخ';
+  static const dateTo = 'إلى تاريخ';
+  static const todayOnly = 'اليوم فقط';
+  static const thisWeek = 'هذا الأسبوع';
+  static const thisMonth = 'هذا الشهر';
+  static const noRecordsInRange = 'لا توجد عمليات في هذه الفترة';
   static const dateUpdated = 'تم تحديث تاريخ العملية';
 }

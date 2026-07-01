@@ -7,15 +7,18 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final asset = isDark ? 'assets/fire_dark.png' : 'assets/fire_light.png';
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(size * 0.22),
       child: Image.asset(
-        'assets/app_icon.png',
+        asset,
         width: size,
         height: size,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         errorBuilder: (_, __, ___) => Icon(
-          Icons.account_balance_wallet_rounded,
+          Icons.local_fire_department_rounded,
           size: size,
           color: Theme.of(context).colorScheme.primary,
         ),

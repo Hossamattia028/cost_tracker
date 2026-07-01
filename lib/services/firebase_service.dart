@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/account.dart';
 import '../models/app_user.dart';
 import '../models/cost_record.dart';
+import '../models/pool_transfer.dart';
 import 'firestore_helper.dart';
 
 class FirebaseService {
@@ -116,6 +117,109 @@ class FirebaseService {
         final batch = _db.batch();
         for (final id in chunk) {
           batch.delete(_db.collection('records').doc(id));
+        }
+        await batch.commit();
+      });
+    }
+  }
+
+  Future<List<Account>> fetchAccounts() async {
+    final snap = await withFirestoreRetry(
+      () => _db.collection('accounts').orderBy('createdAt', descending: true).get(),
+    );
+    return snap.docs.map((d) => Account.fromMap(d.id, d.data())).toList();
+  }
+
+  Future<List<CostRecord>> fetchRecords() async {
+    final snap = await withFirestoreRetry(
+      () => _db.collection('records').orderBy('createdAt', descending: true).get(),
+    );
+    return snap.docs.map((d) => CostRecord.fromMap(d.id, d.data())).toList();
+  }
+
+  Future<List<PoolTransfer>> fetchPoolTransfers() async {
+    final snap = await withFirestoreRetry(
+      () => _db
+          .collection('pool_transfers')
+          .orderBy('createdAt', descending: true)
+          .get(),
+    );
+    return snap.docs.map((d) => PoolTransfer.fromMap(d.id, d.data())).toList();
+  }
+
+  Stream<double> watchGlobalPoolBalance() {
+    return _db.collection('settings').doc('global_pool').snapshots().map(
+          (doc) => (doc.data()?['balance'] as num?)?.toDouble() ?? 0,
+        );
+  }
+
+  Future<double> getGlobalPoolBalance() async {
+    final doc = await withFirestoreRetry(
+      () => _db.collection('settings').doc('global_pool').get(),
+    );
+    return (doc.data()?['balance'] as num?)?.toDouble() ?? 0;
+  }
+
+  Future<void> setGlobalPoolBalance(double balance) async {
+    await withFirestoreRetry(
+      () => _db.collection('settings').doc('global_pool').set(
+            {'balance': balance},
+            SetOptions(merge: true),
+          ),
+    );
+  }
+
+  Future<void> adjustGlobalPoolBalance(double delta) async {
+    await withFirestoreRetry(() async {
+      final ref = _db.collection('settings').doc('global_pool');
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final current = (snap.data()?['balance'] as num?)?.toDouble() ?? 0;
+        tx.set(ref, {'balance': current + delta}, SetOptions(merge: true));
+      });
+    });
+  }
+
+  Stream<List<PoolTransfer>> watchPoolTransfers() {
+    return _db
+        .collection('pool_transfers')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((d) => PoolTransfer.fromMap(d.id, d.data()))
+              .toList(),
+        );
+  }
+
+  Future<String> addPoolTransfer(PoolTransfer transfer) async {
+    final ref = await withFirestoreRetry(
+      () => _db.collection('pool_transfers').add(transfer.toMap()),
+    );
+    return ref.id;
+  }
+
+  Future<void> deletePoolTransfer(String id) async {
+    await withFirestoreRetry(
+      () => _db.collection('pool_transfers').doc(id).delete(),
+    );
+  }
+
+  Future<void> deletePoolTransfersByRecordIds(List<String> recordIds) async {
+    if (recordIds.isEmpty) return;
+    for (var i = 0; i < recordIds.length; i += 10) {
+      final chunk = recordIds.sublist(i, (i + 10).clamp(0, recordIds.length));
+      final snap = await withFirestoreRetry(
+        () => _db
+            .collection('pool_transfers')
+            .where('recordId', whereIn: chunk)
+            .get(),
+      );
+      if (snap.docs.isEmpty) continue;
+      await withFirestoreRetry(() async {
+        final batch = _db.batch();
+        for (final doc in snap.docs) {
+          batch.delete(doc.reference);
         }
         await batch.commit();
       });

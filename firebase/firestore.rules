@@ -33,5 +33,13 @@ service cloud.firestore {
     match /records/{recordId} {
       allow read, write: if isSignedIn();
     }
+
+    match /settings/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /pool_transfers/{transferId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

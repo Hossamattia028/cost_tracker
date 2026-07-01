@@ -5,10 +5,14 @@ import '../models/account.dart';
 import '../services/app_provider.dart';
 import '../widgets/account_form_dialog.dart';
 import '../widgets/account_pin_dialogs.dart';
+import '../widgets/global_pool_header.dart';
 import 'account_detail_screen.dart';
 
 class AccountsScreen extends StatelessWidget {
   const AccountsScreen({super.key});
+
+  Future<void> _onRefresh(BuildContext context) =>
+      context.read<AppProvider>().refreshData();
 
   @override
   Widget build(BuildContext context) {
@@ -18,21 +22,44 @@ class AccountsScreen extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (provider.accounts.isEmpty) {
-          return _EmptyAccounts(
-            onAdd: () => showDialog(
-              context: context,
-              builder: (_) => const AccountFormDialog(),
+          return RefreshIndicator(
+            onRefresh: () => _onRefresh(context),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                const GlobalPoolHeader(),
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).height * 0.5,
+                  child: _EmptyAccounts(
+                    onAdd: () => showDialog(
+                      context: context,
+                      builder: (_) => const AccountFormDialog(),
+                    ),
+                    isAdmin: provider.isAdmin,
+                  ),
+                ),
+              ],
             ),
-            isAdmin: provider.isAdmin,
           );
         }
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: provider.accounts.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (context, i) => _AccountCard(
-            account: provider.accounts[i],
-            isAdmin: provider.isAdmin,
+        return RefreshIndicator(
+          onRefresh: () => _onRefresh(context),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              const GlobalPoolHeader(),
+              const SizedBox(height: 10),
+              ...provider.accounts.map(
+                (account) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _AccountCard(
+                    account: account,
+                    isAdmin: provider.isAdmin,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -52,9 +79,12 @@ class _AccountCard extends StatelessWidget {
     final account = this.account;
     final withdrawn = provider.spentForAccount(account.id);
     final remaining = provider.remainingForAccount(account);
-    final openingRemaining = provider.todayRemainingForAccount(account);
+    final todayOpening = provider.todayOpeningForAccount(account);
+    final todayWithdrawn = provider.todaySpentForAccount(account.id);
+    final todayRemaining = provider.todayRemainingForAccount(account);
 
     return Card(
+      margin: const EdgeInsets.only(bottom: 10),
       color: cs.surfaceContainerLow,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -107,7 +137,7 @@ class _AccountCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         _BalancePill(
-                          label: 'سحب حتى الآن',
+                          label: 'المسحوب',
                           value: withdrawn,
                           currency: account.currency,
                           background: cs.errorContainer,
@@ -124,7 +154,11 @@ class _AccountCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'افتتاحي اليوم: ${account.openingBalance.toStringAsFixed(2)} ${account.currency}  |  المتبقي اليوم: ${openingRemaining.toStringAsFixed(2)} ${account.currency}',
+                      'افتتاحي اليوم: ${todayOpening.toStringAsFixed(2)} ${account.currency}',
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                    ),
+                    Text(
+                      'سحب اليوم: ${todayWithdrawn.toStringAsFixed(2)} ${account.currency}  |  متبقي اليوم: ${todayRemaining.toStringAsFixed(2)} ${account.currency}',
                       style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
@@ -157,6 +191,32 @@ class _AccountCard extends StatelessWidget {
                         context: context,
                         builder: (_) => AccountFormDialog(account: account),
                       );
+                    } else if (v == 'reset') {
+                      final allowed = await showVerifyPinDialog(context);
+                      if (!allowed || !context.mounted) return;
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('تصفية الحساب'),
+                          content: const Text(
+                            'سيتم تصفير المسحوب وإضافة المتبقي (موجب أو سالب) '
+                            'إلى الرصيد الكلي للحساب. هل تريد المتابعة؟',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text(AppStrings.cancel),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('تصفية'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true && context.mounted) {
+                        await context.read<AppProvider>().resetAccount(account.id);
+                      }
                     } else if (v == 'delete') {
                       final allowed = await showVerifyPinDialog(context);
                       if (!allowed || !context.mounted) return;
@@ -184,6 +244,10 @@ class _AccountCard extends StatelessWidget {
                   },
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'edit', child: Text(AppStrings.edit)),
+                    PopupMenuItem(
+                      value: 'reset',
+                      child: Text('تصفية الحساب'),
+                    ),
                     PopupMenuItem(
                       value: 'delete',
                       child: Text(AppStrings.delete,

@@ -6,7 +6,7 @@ import 'core/app_strings.dart';
 import 'screens/auth_gate.dart';
 import 'services/app_provider.dart';
 import 'services/firebase_bootstrap.dart';
-import 'widgets/app_logo.dart';
+import 'widgets/app_logo_title.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,14 +58,17 @@ class _BootstrapAppState extends State<BootstrapApp> {
     }
 
     if (!_ready) {
-      return const MaterialApp(
+      return MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AppLogo(size: 96),
+              children: const [
+                AppLogoTitle(
+                  title: AppStrings.appName,
+                  vertical: true,
+                ),
                 SizedBox(height: 24),
                 CircularProgressIndicator(),
                 SizedBox(height: 12),

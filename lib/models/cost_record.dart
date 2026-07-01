@@ -45,19 +45,21 @@ class CostRecord {
 
   CostRecord copyWith({
     String? id,
+    String? accountId,
     double? amount,
     String? note,
     String? imageUrl,
     int? receiptImageId,
+    DateTime? createdAt,
   }) =>
       CostRecord(
         id: id ?? this.id,
-        accountId: accountId,
+        accountId: accountId ?? this.accountId,
         amount: amount ?? this.amount,
         note: note ?? this.note,
         imageUrl: imageUrl ?? this.imageUrl,
         receiptImageId: receiptImageId ?? this.receiptImageId,
-        createdAt: createdAt,
+        createdAt: createdAt ?? this.createdAt,
         createdBy: createdBy,
       );
 }
